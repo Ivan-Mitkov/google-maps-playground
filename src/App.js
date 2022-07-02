@@ -17,9 +17,10 @@ import {
   Marker,
   Autocomplete,
   DirectionsRenderer,
+  InfoBox,
 } from "@react-google-maps/api";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
 const center = { lat: 42.698334, lng: 23.319941 };
 
@@ -37,20 +38,28 @@ window.navigator.geolocation.getCurrentPosition((pos) =>
 );
 
 const libraries = ["places"];
-
+const options = {
+  googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+  libraries,
+};
 function App() {
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries,
-  });
-
+  const { isLoaded } = useJsApiLoader(options);
+  const [autocompleteOrigin, setAutocompleteOrigin] = useState(null);
+  const [autocompleteDestination, setAutocompleteDestination] = useState(null);
   const [map, setMap] = useState(/** @type google.maps.Map */ (null));
   const [directionsResponse, setDirectionsResponse] = useState(null);
   const [distance, setDistance] = useState("");
   const [duration, setDuration] = useState("");
+
+  const [markers, setMarkers] = useState([]);
+  const [showInfo, setShowInfo] = useState(false);
+  const [currentMarker, setCurrentMarker] = useState(null);
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
-  const [markers, setMarkers] = useState([]);
+
+  const originRef = useRef("");
+  const destinationRef = useRef("");
+  useEffect(() => {}, []);
 
   if (!isLoaded) {
     return <SkeletonText />;
@@ -60,11 +69,13 @@ function App() {
     if (origin === "" || destination === "") {
       return;
     }
+    const originCoord = origin.latLng;
+    const destinationCoord = destination.latLng;
     // eslint-disable-next-line no-undef
     const directionsService = new google.maps.DirectionsService();
     const results = await directionsService.route({
-      origin,
-      destination,
+      origin: originCoord,
+      destination: destinationCoord,
       // eslint-disable-next-line no-undef
       travelMode: google.maps.TravelMode.DRIVING,
     });
@@ -126,14 +137,16 @@ function App() {
   };
 
   const removeMarker = (markerToRemove) => {
-    console.log(markerToRemove, markers);
-
     setMarkers((state) => [
       ...state.filter((m) => {
-        console.log(m.props.position, markerToRemove.latLng);
         return m.props.position !== markerToRemove.latLng;
       }),
     ]);
+  };
+
+  const showInfoBox = (marker) => {
+    setCurrentMarker(marker);
+    setShowInfo(true);
   };
 
   return (
@@ -166,11 +179,11 @@ function App() {
             position={center}
           />
           {markers.map((m) => {
-            console.log(m);
             return (
               <Marker
                 key={m.id}
-                onClick={removeMarker}
+                onDblClick={removeMarker}
+                onClick={(marker) => showInfoBox(marker)}
                 icon={
                   "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png"
                 }
@@ -181,6 +194,24 @@ function App() {
 
           {directionsResponse && (
             <DirectionsRenderer directions={directionsResponse} />
+          )}
+          {showInfo && (
+            <InfoBox
+              position={currentMarker.latLng}
+              onCloseClick={() => setShowInfo(false)}
+              onUnmount={() => setCurrentMarker(null)}
+            >
+              <div
+                style={{
+                  width: "100px",
+                  height: "100px",
+                  background: "#fff",
+                  padding: "10px",
+                }}
+              >
+                <div>Position: {JSON.stringify(currentMarker.latLng)}</div>
+              </div>
+            </InfoBox>
           )}
         </GoogleMap>
       </Box>
@@ -195,36 +226,38 @@ function App() {
       >
         <HStack spacing={2} justifyContent="space-between">
           <Box flexGrow={1}>
-            <Autocomplete>
-              <Input
-                type="text"
-                placeholder="Origin"
-                value={origin}
-                onClick={(e) => {
-                  console.log(e);
-                  setOrigin(e.target.value);
-                }}
-                onChange={(e) => {
-                  console.log(e);
-                  setOrigin(e.target.value);
-                }}
-              />
+            <Autocomplete
+              onLoad={(a) => !autocompleteOrigin && setAutocompleteOrigin(a)}
+              onPlaceChanged={() => {
+                const place = autocompleteOrigin.getPlace();
+                originRef.current = place.formatted_address;
+                setOrigin({
+                  name: place?.formatted_address,
+                  latLng: place?.geometry.location,
+                });
+              }}
+            >
+              <Input type="text" placeholder="Origin" ref={originRef} />
             </Autocomplete>
           </Box>
           <Box flexGrow={1}>
-            <Autocomplete>
+            <Autocomplete
+              onLoad={(a) =>
+                !autocompleteDestination && setAutocompleteDestination(a)
+              }
+              onPlaceChanged={() => {
+                const place = autocompleteDestination.getPlace();
+                destinationRef.current = place.formatted_address;
+                setDestination({
+                  name: place.formatted_address,
+                  latLng: place.geometry.location,
+                });
+              }}
+            >
               <Input
                 type="text"
                 placeholder="Destination"
-                value={destination}
-                onClick={(e) => {
-                  console.log(e);
-                  setDestination(e.target.value);
-                }}
-                onChange={(e) => {
-                  console.log(e);
-                  setDestination(e.target.value);
-                }}
+                ref={destinationRef}
               />
             </Autocomplete>
           </Box>
