@@ -59,7 +59,6 @@ function App() {
 
   const originRef = useRef("");
   const destinationRef = useRef("");
-  useEffect(() => {}, []);
 
   if (!isLoaded) {
     return <SkeletonText />;
@@ -71,6 +70,7 @@ function App() {
     }
     const originCoord = origin.latLng;
     const destinationCoord = destination.latLng;
+    console.log(destination);
     // eslint-disable-next-line no-undef
     const directionsService = new google.maps.DirectionsService();
     const results = await directionsService.route({
@@ -132,8 +132,16 @@ function App() {
 
   const showClicks = (place) => {
     const latLng = place.latLng;
+
     const marker = <Marker position={latLng} />;
     setMarkers((state) => [...state, marker]);
+    setOrigin({
+      latLng: { lat: center.lat, lng: center.lng },
+    });
+    setDestination({
+      name: place,
+      latLng: place.latLng,
+    });
   };
 
   const removeMarker = (markerToRemove) => {
