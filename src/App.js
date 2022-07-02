@@ -18,11 +18,26 @@ import {
   Autocomplete,
   DirectionsRenderer,
 } from "@react-google-maps/api";
-import { useRef, useState } from "react";
+
+import React, { useEffect, useState } from "react";
 
 const center = { lat: 42.698334, lng: 23.319941 };
 
+const setCenter = (lat, long) => {
+  if (lat) {
+    center.lat = lat;
+  }
+  if (long) {
+    center.lng = long;
+  }
+};
+
+window.navigator.geolocation.getCurrentPosition((pos) =>
+  setCenter(pos.coords.latitude, pos.coords.longitude)
+);
+
 const libraries = ["places"];
+
 function App() {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
@@ -36,10 +51,6 @@ function App() {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [markers, setMarkers] = useState([]);
-  /** @type React.MutableRefObject<HTMLInputElement> */
-  const originRef = useRef();
-  /** @type React.MutableRefObject<HTMLInputElement> */
-  const destiantionRef = useRef();
 
   if (!isLoaded) {
     return <SkeletonText />;
@@ -69,6 +80,7 @@ function App() {
     setOrigin("");
     setDestination("");
   }
+
   const getMapOptions = (maps) => {
     return {
       streetViewControl: false,
@@ -109,8 +121,19 @@ function App() {
 
   const showClicks = (place) => {
     const latLng = place.latLng;
-    console.log(latLng);
-    setMarkers((state) => [...state, latLng]);
+    const marker = <Marker position={latLng} />;
+    setMarkers((state) => [...state, marker]);
+  };
+
+  const removeMarker = (markerToRemove) => {
+    console.log(markerToRemove, markers);
+
+    setMarkers((state) => [
+      ...state.filter((m) => {
+        console.log(m.props.position, markerToRemove.latLng);
+        return m.props.position !== markerToRemove.latLng;
+      }),
+    ]);
   };
 
   return (
@@ -131,9 +154,30 @@ function App() {
           onLoad={(map) => setMap(map)}
           onClick={showClicks}
         >
-          {markers.map((m) => (
-            <Marker position={m} />
-          ))}
+          <Marker
+            icon={{
+              path: "M8 12l-4.7023 2.4721.898-5.236L.3916 5.5279l5.2574-.764L8 0l2.3511 4.764 5.2574.7639-3.8043 3.7082.898 5.236z",
+              fillColor: "yellow",
+              fillOpacity: 0.9,
+              scale: 2,
+              strokeColor: "gold",
+              strokeWeight: 2,
+            }}
+            position={center}
+          />
+          {markers.map((m) => {
+            console.log(m);
+            return (
+              <Marker
+                key={m.id}
+                onClick={removeMarker}
+                icon={
+                  "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png"
+                }
+                position={m.props.position}
+              />
+            );
+          })}
 
           {directionsResponse && (
             <DirectionsRenderer directions={directionsResponse} />
